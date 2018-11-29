@@ -1,0 +1,26 @@
+## Sample systemd Configuration
+## Copyright (c) Jaskirat Rajasansir
+
+[Unit]
+Description=KdbAppSystemdTest
+After=network.target
+
+[Service]
+# By setting the type to be 'notify', the application has to send 'ready' via systemd to become active
+Type=notify
+
+Environment="QLIC=/q/license/folder"
+Environment="QHOME=/q/home/folder"
+Environment="KSL_SO_FOLDER=/systemd/lib/folder"
+
+ExecStart=/usr/bin/taskset -c 1 /q/l64/q /kdb-common/src/require.q -p 43211
+ExecStop=/usr/bin/echo "Not supported"
+
+# By setting the watchdog seconds, systemd is expecting a watchdog at maximum interval of this value
+WatchdogSec=5
+Restart=no
+
+WorkingDirectory=/kdb-common
+
+[Install]
+WantedBy=multi=user.target
