@@ -2,7 +2,7 @@
 // Copyright (c) 2018 Jaskirat Rajasansir
 
 .require.lib each `time`type`file;
-.require.lib each `cron`event;
+.require.lib each `os`event;
 
 
 / The name of the shared object to find
@@ -19,12 +19,20 @@
 .sdi.cfg.nativeFunctionMap[`.sdi.so.sendWatchdog]:(`sendWatchdog; 1);
 .sdi.cfg.nativeFunctionMap[`.sdi.so.sendStatus]:  (`sendStatus; 1);
 
+/ The list of supported OS types for 'systemd' integration
+.sdi.cfg.systemdSupportedOs:`l`v;
+
 
 / Once discovered, the full path to the shared object
 .sdi.soPath:`;
 
 
 .sdi.init:{
+    if[not .os.type in .sdi.cfg.systemdSupportedOs;
+        .log.info "systemd is not supported on the current OS [ OS: ",string[.os.type]," ]";
+        :(::);
+    ];
+
     .sdi.soPath:.sdi.cfg.soName;
 
     if[not "" ~ getenv .sdi.cfg.soPathEnvVar;
@@ -32,18 +40,18 @@
     ];
 
     .sdi.i.loadNativeFunctions[];
-
-    .sdi.sendReady[];
-    .sdi.configureWatchdog[];
-    .sdi.i.setStoppingOnProcessExit[];
  };
 
 
-/ Sends the ready notification to systemd. This is performed on library initialisation
-/  @see .sdi.so.sendReady
-.sdi.sendReady:{
-    .log.info "Notifying systemd that kdb application is ready";
-    .sdi.so.sendReady[];
+/ Signals to systemd that the current process is now ready. It also configures the watchdog (if required in the systemd
+/ file) and will bind the stopping notification to the 'process.exit' event
+/  @see .sdi.i.sendReady
+/  @see .sdi.i.configureWatchdog
+/  @see .sdi.i.setStoppingOnProcessExit
+.sdi.onProcessReady:{
+    .sdi.i.sendReady[];
+    .sdi.i.configureWatchdog[];
+    .sdi.i.setStoppingOnProcessExit[];
  };
 
 / Sends the stopping notification to systemd. This is bound to the process.exit event
@@ -51,27 +59,6 @@
 .sdi.sendStopping:{
     .log.debug "Notifying systemd that kdb application is stopping";
     .sdi.so.sendStopping[];
- };
-
-/ Configures the systemd watchdog if enabled in the systemd file. See the associated systemd service file as an example.
-/ The watchdog interval is half the interval reported back from the systemd to reduce the chance of being killed accidentally
-/  @see .sdi.so.getInterval
-/  @see .sdi.i.sendWatchdog
-/  @see .cron.addRepeatForeverJob
-.sdi.configureWatchdog:{
-    wdInterval:.sdi.so.getInterval[];
-
-    if[0D = wdInterval;
-        .log.info "Application is not configured for watchdog monitoring in systemd. Nothing to do";
-        :(::);
-    ];
-
-    / Send the watchdog every half interval to make sure we don't get killed accidentally
-    sendWdInterval:`timespan$wdInterval % 2;
-
-    .log.info "Configuring systemd watchdog monitoring [ Interval: ",string[wdInterval]," ] [ Send Every: ",string[sendWdInterval]," ]";
-
-    .cron.addRepeatForeverJob[`.sdi.i.sendWatchdog; ::; .time.now[] + 00:00:01; sendWdInterval];
  };
 
 / Sends an arbitrary status string to systemd
@@ -86,7 +73,7 @@
 / Attempts to derive the custom location of the shared object based on the path set in the environment variable. If the
 / specified folder does not contain the shared object, the function will look for 'lib' and 'lib64' folders (based on the
 / current kdb process architecture)
-/  @returns (FilePath) The full path to the shared object (without the .so suffix)
+/  @returns (FilePath) The full path to the shared object (without the .so suffix) for use with 2:
 /  @see .sdi.cfg.soPathEnvVar
 /  @see .sdi.cfg.soName
 .sdi.i.getCustomSoPath:{
@@ -131,6 +118,37 @@
 
         set[kdbFunc; .sdi.soPath 2: value soFunc];
     } each exec kdbFunc from .sdi.cfg.nativeFunctionMap;
+ };
+
+/ Sends the ready notification to systemd. This is performed on library initialisation
+/  @see .sdi.so.sendReady
+.sdi.i.sendReady:{
+    .log.info "Notifying systemd that kdb application is ready";
+    .sdi.so.sendReady[];
+ };
+
+/ Configures the systemd watchdog if enabled in the systemd file. See the associated systemd service file as an example.
+/ The watchdog interval is half the interval reported back from the systemd to reduce the chance of being killed accidentally
+/  @see .sdi.so.getInterval
+/  @see .sdi.i.sendWatchdog
+/  @see .cron.addRepeatForeverJob
+.sdi.i.configureWatchdog:{
+    wdInterval:.sdi.so.getInterval[];
+
+    if[0D = wdInterval;
+        .log.info "Application is not configured for watchdog monitoring in systemd. Nothing to do";
+        :(::);
+    ];
+
+    / Only load 'cron' library if watchdog is required
+    .require.lib`cron;
+
+    / Send the watchdog every half interval to make sure we don't get killed accidentally
+    sendWdInterval:`timespan$wdInterval % 2;
+
+    .log.info "Configuring systemd watchdog monitoring [ Interval: ",string[wdInterval]," ] [ Send Every: ",string[sendWdInterval]," ]";
+
+    .cron.addRepeatForeverJob[`.sdi.i.sendWatchdog; ::; .time.now[] + 00:00:01; sendWdInterval];
  };
 
 / Sends the systemd watchdog (or heartbeat). Includes a trace log for debugging
