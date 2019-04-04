@@ -7,7 +7,7 @@ This repository provides a kdb library to integrate with `systemd`. It provides 
 
 An example systemd service file is provided in the repository.
 
-NOTE: This library requires the shared object `libkdbsystemd.so` provided by the [kdb-systemd-lib](https://github.com/jasraj/kdb-systemd-lib) repository. Please ensure that this object is loaded and available in your target environment.
+NOTE: This library requires the shared object `libkdbsystemd.so` provided by the [kdb-systemd-lib](https://github.com/jasraj/kdb-systemd-lib) repository. Please ensure that this object is available in your target environment.
 
 This library has been written for use with the [kdb-common](https://github.com/BuaBook/kdb-common) set of libraries.
 
@@ -16,3 +16,23 @@ This library has been written for use with the [kdb-common](https://github.com/B
 See [kdb-systemd-lib](https://github.com/jasraj/kdb-systemd-lib) for build instructions
 
 ## Using the Notification Library
+
+// TODO: Library path setup
+
+When the library is loaded and `.sdi.init` is executed (see kdb-common [require.q](https://github.com/BuaBook/kdb-common/wiki/require.q) for more details), the following initialisation is performed:
+
+1. Attempt to discover the full path of the required shared object (`libkdbsystemd.so`)
+1. The systemd interface functions are loaded from the shared object into the `.sdi.so` namespace.
+
+### `.sdi.onProcessReady[]`
+
+This function should be called after the process initialistion phases is complete and you want to report back to systemd that the process is ready for use. This function also:
+
+1. Configures the systemd watchdog (i.e. heartbeat) if configured in the systemd file (using the kdb-common [cron.q](https://github.com/BuaBook/kdb-common/wiki/cron.q) library)
+1. Configures notifying systemd when the process is about to exit (using the kdb-common [event.q](https://github.com/BuaBook/kdb-common/wiki/event.q) library)
+
+### `.sdi.sendStatus[status]`
+
+This function allows you to send custom status strings to systemd for more detailed status reporting
+
+// TODO: Send status example
