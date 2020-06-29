@@ -29,7 +29,7 @@
 
 .sdi.init:{
     if[not .os.type in .sdi.cfg.systemdSupportedOs;
-        .log.info "systemd is not supported on the current OS [ OS: ",string[.os.type]," ]";
+        .log.if.info "systemd is not supported on the current OS [ OS: ",string[.os.type]," ]";
         :(::);
     ];
 
@@ -57,7 +57,7 @@
 / Sends the stopping notification to systemd. This is bound to the process.exit event
 /  @see .sdi.so.sendStopping
 .sdi.sendStopping:{
-    .log.debug "Notifying systemd that kdb application is stopping";
+    .log.if.debug "Notifying systemd that kdb application is stopping";
     .sdi.so.sendStopping[];
  };
 
@@ -65,7 +65,7 @@
 /  @param (Symbol|String) The status to send to systemd
 /  @see .sdi.so.sendStatus
 .sdi.sendStatus:{[status]
-    .log.debug "Sending systemd status [ Status: ",.type.ensureString[status]," ]";
+    .log.if.debug "Sending systemd status [ Status: ",.type.ensureString[status]," ]";
     .sdi.so.sendStatus status;
  };
 
@@ -81,40 +81,40 @@
     soFileName:` sv .sdi.cfg.soName,`so;
 
     if[soFileName in .file.ls customSoPath;
-        .log.info "Shared object found in root of custom folder path [ Path: ",string[customSoPath]," ]";
+        .log.if.info "Shared object found in root of custom folder path [ Path: ",string[customSoPath]," ]";
         :` sv customSoPath,.sdi.cfg.soName;
     ];
 
     if[(`x86 = .util.getProcessArchitecture[]) & `lib in .file.ls customSoPath;
-        .log.info "32-bit shared object found in 'lib' folder [ Path: ",string[customSoPath]," ]";
+        .log.if.info "32-bit shared object found in 'lib' folder [ Path: ",string[customSoPath]," ]";
         :` sv customSoPath,`lib,.sdi.cfg.soName;
     ];
 
     if[(`x86_64 = .util.getProcessArchitecture[]) & `lib64 in .file.ls customSoPath;
-        .log.info "64-bit shared object found in 'lib64' folder [ Path: ",string[customSoPath]," ]";
+        .log.if.info "64-bit shared object found in 'lib64' folder [ Path: ",string[customSoPath]," ]";
         :` sv customSoPath,`lib64,.sdi.cfg.soName;
     ];
 
-    .log.error "Shared object could not be found within the custom folder path specified [ Path: ",string[customSoPath]," ]";
+    .log.if.error "Shared object could not be found within the custom folder path specified [ Path: ",string[customSoPath]," ]";
     '"MissingSharedObjectException";
  };
 
 / Binds the stopping notification to the process.exit event
 /  @see .sdi.sendStopping
 .sdi.i.setStoppingOnProcessExit:{
-    .log.info "Setting systemd 'stopping' notification on process exit";
+    .log.if.info "Setting systemd 'stopping' notification on process exit";
     .event.addListener[`process.exit; `.sdi.sendStopping];
  };
 
 / Loads and maps the native functions available in the shared object to kdb functions
 / @see .sdi.cfg.nativeFunctionMap
 .sdi.i.loadNativeFunctions:{
-    .log.info "Loading native functions [ Shared Object: ",string[.sdi.soPath]," ] [ Native Functions: ",string[count .sdi.cfg.nativeFunctionMap]," ]";
+    .log.if.info "Loading native functions [ Shared Object: ",string[.sdi.soPath]," ] [ Native Functions: ",string[count .sdi.cfg.nativeFunctionMap]," ]";
 
     {[kdbFunc]
         soFunc:.sdi.cfg.nativeFunctionMap kdbFunc;
 
-        .log.debug "Loading native function [ kdb: ",string[kdbFunc]," ] [ Native: ",.Q.s1[soFunc]," ]";
+        .log.if.debug "Loading native function [ kdb: ",string[kdbFunc]," ] [ Native: ",.Q.s1[soFunc]," ]";
 
         set[kdbFunc; .sdi.soPath 2: value soFunc];
     } each exec kdbFunc from .sdi.cfg.nativeFunctionMap;
@@ -123,7 +123,7 @@
 / Sends the ready notification to systemd. This is performed on library initialisation
 /  @see .sdi.so.sendReady
 .sdi.i.sendReady:{
-    .log.info "Notifying systemd that kdb application is ready";
+    .log.if.info "Notifying systemd that kdb application is ready";
     .sdi.so.sendReady[];
  };
 
@@ -136,7 +136,7 @@
     wdInterval:.sdi.so.getInterval[];
 
     if[0D = wdInterval;
-        .log.info "Application is not configured for watchdog monitoring in systemd. Nothing to do";
+        .log.if.info "Application is not configured for watchdog monitoring in systemd. Nothing to do";
         :(::);
     ];
 
@@ -146,7 +146,7 @@
     / Send the watchdog every half interval to make sure we don't get killed accidentally
     sendWdInterval:`timespan$wdInterval % 2;
 
-    .log.info "Configuring systemd watchdog monitoring [ Interval: ",string[wdInterval]," ] [ Send Every: ",string[sendWdInterval]," ]";
+    .log.if.info "Configuring systemd watchdog monitoring [ Interval: ",string[wdInterval]," ] [ Send Every: ",string[sendWdInterval]," ]";
 
     .cron.addRepeatForeverJob[`.sdi.i.sendWatchdog; ::; .time.now[] + 00:00:01; sendWdInterval];
  };
@@ -154,6 +154,6 @@
 / Sends the systemd watchdog (or heartbeat). Includes a trace log for debugging
 /  @see .sdi.so.sendWatchdog
 .sdi.i.sendWatchdog:{
-    .log.trace "Sending systemd watchdog";
+    .log.if.trace "Sending systemd watchdog";
     .sdi.so.sendWatchdog[];
  };
