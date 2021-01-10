@@ -8,7 +8,7 @@ This repository provides a kdb library to integrate with `systemd`. It provides 
 
 An example systemd service file is provided in the repository.
 
-NOTE: This library requires the shared object `libkdbsystemd.so` provided by the [kdb-systemd-lib](https://github.com/jasraj/kdb-systemd-lib) repository. Please ensure that this object is available in your target environment.
+NOTE: This library requires the shared object `libkdbsystemd.so` provided by the [kdb-systemd-lib](https://github.com/jasraj/kdb-systemd-lib) repository. Please ensure that this object is available in your target environment and it's location referenced in `LD_LIBRARY_PATH`.
 
 This library has been written for use with the [kdb-common](https://github.com/BuaBook/kdb-common) set of libraries.
 
@@ -18,12 +18,10 @@ See [kdb-systemd-lib](https://github.com/jasraj/kdb-systemd-lib) for build instr
 
 ## Using the Notification Library
 
-It is recommended to specify where the `libkdbsystemd.so` shared library is located by setting the `KSL_SO_FOLDER` environment variable. The library will then use that library on initialisation.
-
 When the library is loaded and `.sdi.init` is executed (see kdb-common [require.q](https://github.com/BuaBook/kdb-common/wiki/require.q) for more details), the following initialisation is performed:
 
-1. Attempt to discover the full path of the required shared object (`libkdbsystemd.so`)
-1. The systemd interface functions are loaded from the shared object into the `.sdi.so` namespace.
+1. Attempt to discover the find the required shared object (`libkdbsystemd.so`) within `LD_LIBRARY_PATH`
+1. The systemd interface functions are loaded from the shared object into the `.sdi.so` namespace
 
 ### `.sdi.onProcessReady[]`
 
