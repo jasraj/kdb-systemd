@@ -17,9 +17,17 @@
 .sdi.cfg.soFunctionMap[`getInterval]:   1;
 .sdi.cfg.soFunctionMap[`sendWatchdog]:  1;
 .sdi.cfg.soFunctionMap[`sendStatus]:    1;
+.sdi.cfg.soFunctionMap[`sendMainPid]:   1;
+.sdi.cfg.soFunctionMap[`extendTimeout]: 1;
 
 / The list of supported OS types for 'systemd' integration
 .sdi.cfg.systemdSupportedOs:`l`v;
+
+
+/ Logs the 'systemd' state transitions based on the functions called in this library
+/  @see .sdi.i.sendReady
+/  @see .sdi.sendStopping
+.sdi.state:`state xkey flip `state`transitionAt!"SP"$\:();
 
 
 .sdi.init:{
@@ -29,6 +37,8 @@
     ];
 
     .sdi.i.loadNativeFunctions[];
+
+    `.sdi.state upsert (`starting; .time.now[]);
  };
 
 
@@ -47,6 +57,8 @@
 /  @see .sdi.so.sendStopping
 .sdi.sendStopping:{
     .log.if.debug "Notifying systemd that kdb application is stopping";
+    `.sdi.state upsert (`stopping; .time.now[]);
+
     .sdi.so.sendStopping[];
  };
 
@@ -58,6 +70,30 @@
     .sdi.so.sendStatus status;
  };
 
+/ Sends the main PID of the application to systemd
+/  @param pid (Integer) Null to send the current pid ('.z.i') or a PID if a different 'primary' process
+/  @see .sdi.so.sendMainPid
+.sdi.sendMainPid:{[pid]
+    $[null pid;
+        pid:.z.i;
+    not .type.isInteger pid;
+        '"IllegalArgumentException"
+    ];
+
+    .log.if.debug ("Sending main PID to systemd [ PID: {} ]"; pid);
+    .sdi.so.sendMainPid pid;
+ };
+
+.sdi.extendTimeout:{[extension]
+    if[not .type.isTimespan extension;
+        '"IllegalArgumentException";
+    ];
+
+    currentState:last[0!.sdi.state]`state;
+
+    .log.if.info ("Extending systemd timeout [ Current State: {} ] [ Extension: {} ]"; currentState; extension);
+    .sdi.so.extendTimeout currentState;
+ };
 
 / Binds the stopping notification to the process.exit event
 /  @see .sdi.sendStopping
@@ -83,6 +119,8 @@
 /  @see .sdi.so.sendReady
 .sdi.i.sendReady:{
     .log.if.info "Notifying systemd that kdb application is ready";
+    `.sdi.state upsert (`ready; .time.now[]);
+
     .sdi.so.sendReady[];
  };
 
